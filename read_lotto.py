@@ -45,7 +45,27 @@ def build_cities_dict(df: pd.DataFrame, cities: set) -> dict:
         trunc_sub = df.drop([1], axis=1)
         cities_dict[city] = trunc_sub
     return cities_dict
-        
+
+def build_training_set(dataframe: pd.DataFrame):
+    scaler = StandardScaler().fit(dataframe)
+    transformed_dataset = scaler.transform(dataframe)
+    transformed_df = pd.DataFrame(data=transformed_dataset, index=dataframe.index)
+    print(transformed_df.head())
+
+    number_of_rows = dataframe.values.shape[0]
+    window_length = 7
+    # number of balls for a "ruota"
+    number_of_features = dataframe.values.shape[1]
+
+    # create the training set
+    X = np.empty([ number_of_rows - window_length, window_length, number_of_features], dtype=float)
+    y = np.empty([ number_of_rows - window_length, number_of_features], dtype=float)
+    for i in range(0, number_of_rows-window_length):
+        X[i] = transformed_df.iloc[i : i+window_length, 0 : number_of_features]
+        y[i] = transformed_df.iloc[i+window_length : i+window_length+1, 0 : number_of_features]
+    input_shape=(window_length, number_of_features)
+    return X, y, input_shape, number_of_features
+
 def main():
     print("Hello World!")
     df = pd.read_csv('storico.txt', sep='\t', header=None, na_filter=False)
@@ -56,35 +76,19 @@ def main():
 
     cities_dict = build_cities_dict(df, cities)
 
-    city = "NA"
+    # normalize the data into format [0,1] and build the training set
+    X, y, input_shape, number_of_features = build_training_set(cities_dict["NA"])
 
-    # normalize the data into format [0,1]
-    scaler = StandardScaler().fit(cities_dict[city])
-    transformed_dataset = scaler.transform(cities_dict[city])
-    transformed_df = pd.DataFrame(data=transformed_dataset, index=cities_dict[city].index)
-    print(transformed_df.head())
-
-    number_of_rows = cities_dict["NA"].values.shape[0]
-    window_length = 7
-    # number of balls for a "ruota"
-    number_of_features = cities_dict["NA"].values.shape[1]
-
-    # create the training set
-    X = np.empty([ number_of_rows - window_length, window_length, number_of_features], dtype=float)
-    y = np.empty([ number_of_rows - window_length, number_of_features], dtype=float)
-    for i in range(0, number_of_rows-window_length):
-        X[i] = transformed_df.iloc[i : i+window_length, 0 : number_of_features]
-        y[i] = transformed_df.iloc[i+window_length : i+window_length+1, 0 : number_of_features]
     print(f"X shape: {X.shape}; y shape: {y.shape}")
     
-    print("Training the model...")
+    print("Training the model on a single city...")
     model = rnn(units=240, 
                 dense_units=59, 
-                input_shape=(window_length, number_of_features), 
+                input_shape=input_shape, 
                 number_of_features=number_of_features, 
                 X=X, 
                 y=y, 
-                epochs=4, 
+                epochs=1, 
                 batch_size=100, 
                 learning_rate=0.0001)
 
